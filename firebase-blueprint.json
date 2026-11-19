@@ -1,0 +1,370 @@
+{
+  "entities": {
+    "TeacherProfile": {
+      "title": "Teacher Profile",
+      "description": "Teacher settings and active subject preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "schoolName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "department": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "defaultSubject": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "schoolName", "updatedAt"]
+    },
+    "UserAccount": {
+      "title": "User Account",
+      "description": "School-wide Teacher, Student, or Admin account profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "photoURL": { "type": "string", "maxLength": 1000 },
+        "role": { "type": "string", "enum": ["teacher", "student", "admin"] },
+        "status": { "type": "string", "enum": ["active", "pending"] },
+        "studentClass": { "type": "string", "maxLength": 40 },
+        "studentCode": { "type": "string", "maxLength": 40 },
+        "dob": { "type": "string", "maxLength": 30 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "department": { "type": "string", "maxLength": 100 },
+        "inviteCodeUsed": { "type": "string", "maxLength": 40 },
+        "lastLoginAt": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email", "displayName", "role", "status", "lastLoginAt", "createdAt"]
+    },
+    "LoginAuditLog": {
+      "title": "Login Audit Log",
+      "description": "Audit log of Google sign-ins across teachers and students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "photoURL": { "type": "string", "maxLength": 1000 },
+        "role": { "type": "string", "enum": ["teacher", "student", "admin"] },
+        "loginAt": { "type": "string", "maxLength": 64 },
+        "deviceBrowser": { "type": "string", "maxLength": 160 },
+        "userAgent": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "uid", "email", "displayName", "role", "loginAt", "deviceBrowser"]
+    },
+    "GeneratedDocument": {
+      "title": "Generated Document",
+      "description": "Saved exams, worksheets, lesson plans, and blueprints",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "docType": { "type": "string", "enum": ["exam", "worksheet", "lesson_plan", "curriculum", "blueprint"] },
+        "grade": { "type": "string", "enum": ["10", "11", "12"] },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "examCode": { "type": "string", "maxLength": 20 },
+        "payload": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "title", "docType", "grade", "subject", "payload", "createdAt", "updatedAt"]
+    },
+    "ClassStudent": {
+      "title": "Class Student",
+      "description": "Homeroom student roster and seating coordinates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "dob": { "type": "string", "maxLength": 20 },
+        "studentPhone": { "type": "string", "maxLength": 25 },
+        "parentName": { "type": "string", "maxLength": 120 },
+        "parentPhone": { "type": "string", "maxLength": 25 },
+        "role": { "type": "string", "maxLength": 60 },
+        "seatRow": { "type": "integer" },
+        "seatCol": { "type": "integer" },
+        "pinned": { "type": "boolean" },
+        "conductScore": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "fullName", "seatRow", "seatCol", "pinned", "conductScore", "createdAt", "updatedAt"]
+    },
+    "OnlineExamRoom": {
+      "title": "Online Exam Room",
+      "description": "Online testing room generated from PDF or exam bank",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "pinCode": { "type": "string", "minLength": 4, "maxLength": 12 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "grade": { "type": "string", "enum": ["10", "11", "12"] },
+        "assignedClass": { "type": "string", "maxLength": 40 },
+        "durationMinutes": { "type": "integer" },
+        "antiCheat": { "type": "boolean" },
+        "allowReviewSolutions": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "closed"] },
+        "answerKey": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "pinCode", "title", "subject", "durationMinutes", "antiCheat", "status", "createdAt", "updatedAt"]
+    },
+    "ExamSubmission": {
+      "title": "Exam Submission",
+      "description": "Student submission record for an online exam room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentEmail": { "type": "string", "maxLength": 160 },
+        "studentCode": { "type": "string", "maxLength": 40 },
+        "roomId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "roomTitle": { "type": "string", "maxLength": 200 },
+        "studentName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "studentClass": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "grade": { "type": "string", "enum": ["10", "11", "12"] },
+        "examCode": { "type": "string", "maxLength": 20 },
+        "score": { "type": "number" },
+        "part1Score": { "type": "number" },
+        "part2Score": { "type": "number" },
+        "part3Score": { "type": "number" },
+        "durationSeconds": { "type": "integer" },
+        "tabSwitches": { "type": "integer" },
+        "answersPayload": { "type": "object" },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "roomId", "studentName", "studentClass", "score", "tabSwitches", "submittedAt"]
+    },
+    "GradebookEntry": {
+      "title": "Subject Gradebook Entry",
+      "description": "SMAS 4.0 and Circular 22 student grade record per class and semester",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "classId": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "semester": { "type": "integer" },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "tx1": { "type": "number" },
+        "tx2": { "type": "number" },
+        "tx3": { "type": "number" },
+        "tx4": { "type": "number" },
+        "tx5": { "type": "number" },
+        "gk": { "type": "number" },
+        "ck": { "type": "number" },
+        "tbm": { "type": "number" },
+        "remark": { "type": "string", "maxLength": 600 },
+        "yearRemark": { "type": "string", "maxLength": 600 },
+        "syncedAttemptIds": { "type": "array" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "ownerId", "classId", "semester", "studentId", "remark", "updatedAt"]
+    },
+    "BankQuestion": {
+      "title": "Bank Question",
+      "description": "Curriculum-tagged math question stored verbatim with images, tables, and solutions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "partType": { "type": "string", "enum": ["part1", "part2", "part3"] },
+        "tag": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "grade": { "type": "string", "enum": ["10", "11", "12"] },
+        "chapter": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "lesson": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "level": { "type": "string", "enum": ["NB", "TH", "VD", "VDC"] },
+        "stem": { "type": "string", "minLength": 1, "maxLength": 25000 },
+        "options": { "type": "array" },
+        "correctIndex": { "type": "integer" },
+        "statements": { "type": "array" },
+        "answer": { "type": "string", "maxLength": 32 },
+        "diagram": { "type": "string", "maxLength": 64 },
+        "image": { "type": "string", "maxLength": 250000 },
+        "images": { "type": "array" },
+        "solutionImage": { "type": "string", "maxLength": 250000 },
+        "solutionImages": { "type": "array" },
+        "tableRows": { "type": "array" },
+        "solutionSteps": { "type": "array" },
+        "source": { "type": "string", "maxLength": 200 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "ownerId", "partType", "tag", "grade", "chapter", "lesson", "level", "stem", "updatedAt"]
+    },
+    "HomeworkAssignment": {
+      "title": "Homework Assignment",
+      "description": "Online homework assignment synchronized between Teacher Workspace and Student Portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "pinCode": { "type": "string", "minLength": 4, "maxLength": 16 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "grade": { "type": "string", "enum": ["10", "11", "12"] },
+        "sourceType": { "type": "string", "enum": ["bank", "upload_docx_pdf", "essay_sgk"] },
+        "targetMode": { "type": "string", "enum": ["classes", "remedial_below_threshold", "manual_students"] },
+        "targetClassIds": { "type": "array" },
+        "targetClassNames": { "type": "array" },
+        "targetStudentIds": { "type": "array" },
+        "targetStudentCodes": { "type": "array" },
+        "targetStudentNames": { "type": "array" },
+        "targetLabel": { "type": "string", "maxLength": 240 },
+        "remedialConfig": { "type": "object" },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "allowLateSubmission": { "type": "boolean" },
+        "allowReviewSolutions": { "type": "boolean" },
+        "requireEssayPhotos": { "type": "boolean" },
+        "essayPromptText": { "type": "string", "maxLength": 15000 },
+        "essayPromptImages": { "type": "array" },
+        "objectiveWeightPoints": { "type": "number" },
+        "essayWeightPoints": { "type": "number" },
+        "answerKey": { "type": "object" },
+        "examPaperSnapshot": { "type": "object" },
+        "status": { "type": "string", "enum": ["active", "closed"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "pinCode", "title", "subject", "grade", "sourceType", "targetMode", "targetClassNames", "dueDate", "status", "createdAt"]
+    },
+    "HomeworkSubmission": {
+      "title": "Homework Submission",
+      "description": "Student submission for an online homework assignment including objective answers and compressed essay photos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "homeworkId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "homeworkTitle": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentEmail": { "type": "string", "maxLength": 160 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentCode": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "studentName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "studentClass": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "classId": { "type": "string", "maxLength": 80 },
+        "answersPayload": { "type": "object" },
+        "essayImages": { "type": "array" },
+        "essayTextAnswer": { "type": "string", "maxLength": 15000 },
+        "objectiveScore": { "type": "number" },
+        "essayScore": { "type": "number" },
+        "totalScore": { "type": "number" },
+        "gradingStatus": { "type": "string", "enum": ["auto_graded", "pending_essay_review", "graded"] },
+        "teacherFeedback": { "type": "string", "maxLength": 1000 },
+        "syncedToSmas": { "type": "boolean" },
+        "syncedColumn": { "type": "string", "maxLength": 20 },
+        "submittedAt": { "type": "string", "maxLength": 64 },
+        "gradedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "homeworkId", "homeworkTitle", "studentCode", "studentName", "studentClass", "objectiveScore", "totalScore", "gradingStatus", "submittedAt"]
+    },
+    "SharedLesson": {
+      "title": "Shared Lesson",
+      "description": "Structured 3-part pedagogical lesson synchronized between TeachLearn Edu Main App and TeachLearn Board",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "grade": { "type": "string", "enum": ["10", "11", "12"] },
+        "chapterId": { "type": "string", "maxLength": 40 },
+        "chapterTitle": { "type": "string", "maxLength": 200 },
+        "lessonTitle": { "type": "string", "maxLength": 200 },
+        "subject": { "type": "string", "maxLength": 60 },
+        "sourceType": { "type": "string", "enum": ["cloud_app", "local_file", "google_drive"] },
+        "driveEmbedUrl": { "type": "string", "maxLength": 1000 },
+        "theoryItems": { "type": "array" },
+        "exampleItems": { "type": "array" },
+        "exerciseItems": { "type": "array" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "grade", "chapterTitle", "lessonTitle", "theoryItems", "updatedAt"]
+    },
+    "SystemConfig": {
+      "title": "System Configuration",
+      "description": "Owner-only system configuration and master settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "ownerEmail": { "type": "string", "maxLength": 160 },
+        "payload": { "type": "object" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/profile/main": {
+      "schema": { "$ref": "#/entities/TeacherProfile" },
+      "description": "Private teacher profile configuration"
+    },
+    "/userAccounts/{uid}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "School-wide Teacher and Student user accounts"
+    },
+    "/loginLogs/{logId}": {
+      "schema": { "$ref": "#/entities/LoginAuditLog" },
+      "description": "Audit log of Google logins across the school"
+    },
+    "/documents/{docId}": {
+      "schema": { "$ref": "#/entities/GeneratedDocument" },
+      "description": "Owner-only generated exams, worksheets, lesson plans, and smartboard notebooks"
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/ClassStudent" },
+      "description": "Owner-only student roster and seating layout"
+    },
+    "/classes/{classId}": {
+      "schema": { "$ref": "#/entities/ClassStudent" },
+      "description": "Owner-only classroom directory"
+    },
+    "/examRooms/{roomId}": {
+      "schema": { "$ref": "#/entities/OnlineExamRoom" },
+      "description": "Owner-only online exam rooms"
+    },
+    "/examSubmissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/ExamSubmission" },
+      "description": "Student exam submission analytics"
+    },
+    "/gradebookEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/GradebookEntry" },
+      "description": "Owner-only SMAS 4.0 subject gradebook entries"
+    },
+    "/grades_smas/{entryId}": {
+      "schema": { "$ref": "#/entities/GradebookEntry" },
+      "description": "Owner-only SMAS 4.0 official gradebook table"
+    },
+    "/bankQuestions/{questionId}": {
+      "schema": { "$ref": "#/entities/BankQuestion" },
+      "description": "Owner-only curriculum-tagged question bank repository"
+    },
+    "/question_bank/{questionId}": {
+      "schema": { "$ref": "#/entities/BankQuestion" },
+      "description": "Owner-only question_bank collection"
+    },
+    "/homeworkAssignments/{homeworkId}": {
+      "schema": { "$ref": "#/entities/HomeworkAssignment" },
+      "description": "Owner-only homework and student notebook assignments"
+    },
+    "/homeworkSubmissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/HomeworkSubmission" },
+      "description": "Student homework submissions"
+    },
+    "/lessons/{lessonId}": {
+      "schema": { "$ref": "#/entities/SharedLesson" },
+      "description": "Owner-only shared pedagogical lessons synchronized with TeachLearn Board"
+    },
+    "/system_config/{configId}": {
+      "schema": { "$ref": "#/entities/SystemConfig" },
+      "description": "Owner-only system configuration table"
+    }
+  }
+}

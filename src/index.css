@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  --font-display: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  :root {
+    --font-display: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+    --font-body: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+    --font-paper: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  }
+
+  html,
+  body,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  button,
+  input,
+  select,
+  textarea,
+  table,
+  th,
+  td,
+  code,
+  pre {
+    font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    background-color: #F1F5F9;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.a4-paper {
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #0F172A;
+  background: #FFFFFF;
+  overflow-wrap: break-word;
+}
+
+@media (min-width: 640px) {
+  .a4-paper {
+    font-size: 14px;
+  }
+}
+
+.a4-paper .katex {
+  font-size: 1.02em;
+}
+
+.a4-paper .katex-display,
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 2px;
+  padding-bottom: 4px;
+}
+
+.math-block-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.math-inline-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom subtle scrollbars for SMAS 4.0 Deep Teal studio */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(19, 111, 99, 0.25);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(19, 111, 99, 0.45);
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 20mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-a4,
+  .print-only-a4 * {
+    transform: none !important;
+  }
+
+  .print-only-a4 {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+}
+
+/* Unified SMAS 4.0 Deep Teal Tab & Action Buttons */
+.btn-glossy-3d-active {
+  background-color: #136F63;
+  border: 1px solid #136F63;
+  color: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.btn-glossy-3d-active:hover {
+  background-color: #0F594F;
+  border-color: #0F594F;
+}
+
+.btn-glossy-3d-active:active {
+  transform: translateY(1px);
+}
+
+.btn-glossy-3d-inactive {
+  background-color: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #334155;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.btn-glossy-3d-inactive:hover {
+  background-color: #F8FAFC;
+  border-color: #136F63;
+  color: #136F63;
+}
+
+.btn-glossy-3d-inactive:active {
+  transform: translateY(1px);
+}
+
+.dark .btn-glossy-3d-inactive {
+  background-color: #0F172A;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+
+.dark .btn-glossy-3d-inactive:hover {
+  background-color: #1E293B;
+  border-color: #136F63;
+  color: #FFFFFF;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .sidebar-rich-tooltip {
+    display: none !important;
+  }
+}
+
+/* Smartboard 65-86" Fullscreen Classroom Typography (18px - 20px) */
+.smartboard-fs-content {
+  font-size: 19px;
+  line-height: 1.6;
+}
+
+.smartboard-fs-content p,
+.smartboard-fs-content li,
+.smartboard-fs-content td,
+.smartboard-fs-content th,
+.smartboard-fs-content label,
+.smartboard-fs-content .a4-paper {
+  font-size: 19px !important;
+  line-height: 1.65 !important;
+}
+
+.smartboard-fs-content h1,
+.smartboard-fs-content h2 {
+  font-size: 24px !important;
+}
+
+.smartboard-fs-content h3,
+.smartboard-fs-content h4 {
+  font-size: 20px !important;
+}
+
+.smartboard-fs-content button,
+.smartboard-fs-content input,
+.smartboard-fs-content select {
+  min-height: 48px;
+}
+
+.smartboard-fs-content .katex {
+  font-size: 1.06em;
+}
+
+.touch-48 {
+  min-height: 48px;
+}
+
+@keyframes smartboard-marching-ants {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -30;
+  }
+}
+
+.smartboard-lasso-ants {
+  animation: smartboard-marching-ants 0.65s linear infinite;
+}

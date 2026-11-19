@@ -1,0 +1,324 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /test/connection {
+      allow get: if true;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && (
+          request.auth.token.email == 'thaytoanlqd1@gmail.com' ||
+          request.auth.token.email == 'Thaytoanlqd1@gmail.com' ||
+          request.auth.token.email == 'ttoanlqd@gmail.com' ||
+          request.auth.token.email == 'TToanlqd@gmail.com'
+        );
+    }
+
+    function isTeacherOrAdmin() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/userAccounts/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/userAccounts/$(request.auth.uid)).data.role in ['teacher', 'admin'])
+      );
+    }
+
+    function isValidProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'schoolName', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'schoolName', 'department', 'defaultSubject', 'updatedAt'])
+        && data.uid == userId
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 160
+        && (!('department' in data) || (data.department is string && data.department.size() <= 100))
+        && (!('defaultSubject' in data) || (data.defaultSubject is string && data.defaultSubject.size() <= 60));
+    }
+
+    function isValidUserAccount(data, uid) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'status', 'lastLoginAt', 'createdAt'])
+        && data.uid == uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.role in ['teacher', 'student', 'admin']
+        && data.status in ['active', 'pending'];
+    }
+
+    function isValidLoginLog(data, logId) {
+      return data.keys().hasAll(['id', 'uid', 'email', 'displayName', 'role', 'loginAt', 'deviceBrowser'])
+        && data.id == logId
+        && data.uid == request.auth.uid
+        && data.email is string && data.email.size() <= 160
+        && data.displayName is string && data.displayName.size() <= 120
+        && data.role in ['teacher', 'student', 'admin']
+        && data.deviceBrowser is string && data.deviceBrowser.size() <= 160;
+    }
+
+    function isValidDocument(data, docId) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'docType', 'grade', 'subject', 'payload', 'createdAt', 'updatedAt'])
+        && data.id == docId
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.docType in ['exam', 'worksheet', 'lesson_plan', 'curriculum', 'blueprint', 'smartboard_notebook']
+        && data.grade in ['10', '11', '12']
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60
+        && data.payload is map;
+    }
+
+    function isValidStudent(data, studentId) {
+      return data.keys().hasAll(['id', 'ownerId', 'fullName', 'seatRow', 'seatCol', 'pinned', 'conductScore', 'createdAt', 'updatedAt'])
+        && data.id == studentId
+        && data.ownerId == request.auth.uid
+        && data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120
+        && data.seatRow is int && data.seatRow >= 0 && data.seatRow <= 20
+        && data.seatCol is int && data.seatCol >= 0 && data.seatCol <= 20
+        && data.pinned is bool
+        && data.conductScore is int && data.conductScore >= 0 && data.conductScore <= 500;
+    }
+
+    function isValidExamRoom(data, roomId) {
+      return data.keys().hasAll(['id', 'ownerId', 'pinCode', 'title', 'subject', 'durationMinutes', 'antiCheat', 'status', 'createdAt', 'updatedAt'])
+        && data.id == roomId
+        && data.ownerId == request.auth.uid
+        && data.pinCode is string && data.pinCode.size() >= 4 && data.pinCode.size() <= 12
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60
+        && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 300
+        && data.antiCheat is bool
+        && data.status in ['active', 'closed'];
+    }
+
+    function isValidSubmission(data, submissionId) {
+      return data.keys().hasAll(['id', 'ownerId', 'roomId', 'studentName', 'studentClass', 'score', 'tabSwitches', 'submittedAt'])
+        && data.id == submissionId
+        && data.roomId is string && isValidId(data.roomId)
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && data.studentClass is string && data.studentClass.size() >= 1 && data.studentClass.size() <= 40
+        && data.score is number && data.score >= 0 && data.score <= 20
+        && data.tabSwitches is int && data.tabSwitches >= 0 && data.tabSwitches <= 500;
+    }
+
+    function isNullableScore(val) {
+      return val == null || (val is number && val >= 0 && val <= 10);
+    }
+
+    function isValidGradebookEntry(data, entryId) {
+      return data.keys().hasAll(['id', 'ownerId', 'classId', 'semester', 'studentId', 'remark', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'classId', 'semester', 'studentId', 'tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'gk', 'ck', 'tbm', 'remark', 'yearRemark', 'syncedAttemptIds', 'updatedAt'])
+        && data.id == entryId
+        && data.ownerId == request.auth.uid
+        && data.classId is string && data.classId.size() >= 1 && data.classId.size() <= 80
+        && data.semester is int && (data.semester == 1 || data.semester == 2)
+        && data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128
+        && (!('tx1' in data) || isNullableScore(data.tx1))
+        && (!('tx2' in data) || isNullableScore(data.tx2))
+        && (!('tx3' in data) || isNullableScore(data.tx3))
+        && (!('tx4' in data) || isNullableScore(data.tx4))
+        && (!('tx5' in data) || isNullableScore(data.tx5))
+        && (!('gk' in data) || isNullableScore(data.gk))
+        && (!('ck' in data) || isNullableScore(data.ck))
+        && (!('tbm' in data) || isNullableScore(data.tbm))
+        && data.remark is string && data.remark.size() <= 600
+        && (!('yearRemark' in data) || (data.yearRemark is string && data.yearRemark.size() <= 600))
+        && (!('syncedAttemptIds' in data) || (data.syncedAttemptIds is list && data.syncedAttemptIds.size() <= 100))
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidBankQuestion(data, questionId) {
+      return data.keys().hasAll(['id', 'ownerId', 'partType', 'tag', 'grade', 'chapter', 'lesson', 'level', 'stem', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'partType', 'tag', 'grade', 'chapter', 'lesson', 'level', 'stem',
+          'options', 'correctIndex', 'statements', 'answer', 'diagram',
+          'image', 'images', 'solutionImage', 'solutionImages',
+          'tableRows', 'solutionSteps', 'source', 'updatedAt'
+        ])
+        && data.id == questionId
+        && data.ownerId == request.auth.uid
+        && data.partType in ['part1', 'part2', 'part3']
+        && data.tag is string && data.tag.size() >= 1 && data.tag.size() <= 40
+        && data.grade in ['10', '11', '12']
+        && data.chapter is string && data.chapter.size() >= 1 && data.chapter.size() <= 20
+        && data.lesson is string && data.lesson.size() >= 1 && data.lesson.size() <= 20
+        && data.level in ['NB', 'TH', 'VD', 'VDC']
+        && data.stem is string && data.stem.size() >= 1 && data.stem.size() <= 25000
+        && (!('options' in data) || (data.options is list && data.options.size() <= 4))
+        && (!('correctIndex' in data) || (data.correctIndex is int && data.correctIndex >= 0 && data.correctIndex <= 3))
+        && (!('statements' in data) || (data.statements is list && data.statements.size() <= 4))
+        && (!('answer' in data) || (data.answer is string && data.answer.size() <= 32))
+        && (!('diagram' in data) || (data.diagram is string && data.diagram.size() <= 64))
+        && (!('image' in data) || (data.image is string && data.image.size() <= 250000))
+        && (!('images' in data) || (data.images is list && data.images.size() <= 6))
+        && (!('solutionImage' in data) || (data.solutionImage is string && data.solutionImage.size() <= 250000))
+        && (!('solutionImages' in data) || (data.solutionImages is list && data.solutionImages.size() <= 6))
+        && (!('tableRows' in data) || (data.tableRows is list && data.tableRows.size() <= 40))
+        && (!('solutionSteps' in data) || (data.solutionSteps is list && data.solutionSteps.size() <= 20))
+        && (!('source' in data) || (data.source is string && data.source.size() <= 200))
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidHomeworkAssignment(data, homeworkId) {
+      return data.keys().hasAll(['id', 'pinCode', 'title', 'subject', 'grade', 'sourceType', 'targetMode', 'targetClassNames', 'dueDate', 'status', 'createdAt'])
+        && data.id == homeworkId
+        && data.pinCode is string && data.pinCode.size() >= 4 && data.pinCode.size() <= 16
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60
+        && data.grade in ['10', '11', '12']
+        && data.sourceType in ['bank', 'upload_docx_pdf', 'essay_sgk']
+        && data.targetMode in ['classes', 'remedial_below_threshold', 'manual_students']
+        && data.targetClassNames is list && data.targetClassNames.size() <= 30
+        && data.dueDate is string && data.dueDate.size() <= 64
+        && data.status in ['active', 'closed']
+        && data.createdAt is string && data.createdAt.size() <= 64;
+    }
+
+    function isValidHomeworkSubmission(data, submissionId) {
+      return data.keys().hasAll(['id', 'homeworkId', 'homeworkTitle', 'studentCode', 'studentName', 'studentClass', 'objectiveScore', 'totalScore', 'gradingStatus', 'submittedAt'])
+        && data.id == submissionId
+        && data.homeworkId is string && data.homeworkId.size() >= 1 && data.homeworkId.size() <= 128
+        && data.homeworkTitle is string && data.homeworkTitle.size() >= 1 && data.homeworkTitle.size() <= 240
+        && data.studentCode is string && data.studentCode.size() >= 1 && data.studentCode.size() <= 40
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && data.studentClass is string && data.studentClass.size() >= 1 && data.studentClass.size() <= 40
+        && data.objectiveScore is number && data.objectiveScore >= 0 && data.objectiveScore <= 10
+        && data.totalScore is number && data.totalScore >= 0 && data.totalScore <= 10
+        && data.gradingStatus in ['auto_graded', 'pending_essay_review', 'graded']
+        && (!('essayImages' in data) || (data.essayImages is list && data.essayImages.size() <= 6))
+        && (!('teacherFeedback' in data) || (data.teacherFeedback is string && data.teacherFeedback.size() <= 1000))
+        && data.submittedAt is string && data.submittedAt.size() <= 64;
+    }
+
+    match /users/{userId}/profile/main {
+      allow get: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidId(userId);
+    }
+
+    match /userAccounts/{uid} {
+      allow get: if isSignedIn() && (request.auth.uid == uid || isTeacherOrAdmin());
+      allow list: if isSignedIn() && isTeacherOrAdmin();
+      allow create: if isSignedIn() && request.auth.uid == uid && isValidUserAccount(incoming(), uid);
+      allow update: if isSignedIn() && (request.auth.uid == uid || isAdmin()) && isValidUserAccount(incoming(), uid);
+      allow delete: if isAdmin();
+    }
+
+    match /loginLogs/{logId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId) && isValidLoginLog(incoming(), logId);
+      allow update, delete: if isAdmin() && isValidId(logId);
+    }
+
+    // =========================================================================
+    // STRICT OWNER-ONLY WRITE PROTECTION (ttoanlqd@gmail.com, thaytoanlqd1@gmail.com)
+    // All other authenticated teachers only have read (get, list) permissions
+    // =========================================================================
+
+    function isValidLesson(data, lessonId) {
+      return data.keys().hasAll(['id', 'title', 'grade', 'chapterTitle', 'lessonTitle', 'theoryItems', 'updatedAt'])
+        && data.id == lessonId
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.grade in ['10', '11', '12']
+        && data.chapterTitle is string && data.chapterTitle.size() <= 200
+        && data.lessonTitle is string && data.lessonTitle.size() <= 200
+        && data.theoryItems is list && data.theoryItems.size() <= 30
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // 1. lessons
+    match /lessons/{lessonId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(lessonId) && isValidLesson(incoming(), lessonId);
+      allow delete: if isAdmin() && isValidId(lessonId);
+    }
+
+    // 2. question_bank & bankQuestions
+    match /question_bank/{questionId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(questionId) && isValidBankQuestion(incoming(), questionId);
+      allow delete: if isAdmin() && isValidId(questionId);
+    }
+
+    match /bankQuestions/{questionId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(questionId) && isValidBankQuestion(incoming(), questionId);
+      allow delete: if isAdmin() && isValidId(questionId);
+    }
+
+    // 3. classes & students
+    match /classes/{classId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidId(classId);
+    }
+
+    match /students/{studentId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(studentId) && isValidStudent(incoming(), studentId);
+      allow delete: if isAdmin() && isValidId(studentId);
+    }
+
+    // 4. grades_smas & gradebookEntries
+    match /grades_smas/{entryId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(entryId) && isValidGradebookEntry(incoming(), entryId);
+      allow delete: if isAdmin() && isValidId(entryId);
+    }
+
+    match /gradebookEntries/{entryId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(entryId) && isValidGradebookEntry(incoming(), entryId);
+      allow delete: if isAdmin() && isValidId(entryId);
+    }
+
+    // 5. system_config & documents & homeworkAssignments & examRooms
+    match /system_config/{configId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidId(configId);
+    }
+
+    match /documents/{docId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(docId) && isValidDocument(incoming(), docId);
+      allow delete: if isAdmin() && isValidId(docId);
+    }
+
+    match /homeworkAssignments/{homeworkId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(homeworkId) && isValidHomeworkAssignment(incoming(), homeworkId);
+      allow delete: if isAdmin() && isValidId(homeworkId);
+    }
+
+    match /homeworkSubmissions/{submissionId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(submissionId) && isValidHomeworkSubmission(incoming(), submissionId);
+      allow delete: if isAdmin() && isValidId(submissionId);
+    }
+
+    match /examRooms/{roomId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(roomId) && isValidExamRoom(incoming(), roomId);
+      allow delete: if isAdmin() && isValidId(roomId);
+    }
+
+    match /examSubmissions/{submissionId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin() && isValidId(submissionId);
+    }
+  }
+}
