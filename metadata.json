@@ -1,9 +1,7 @@
 {
   "name": "TeachLearn Board V.06 Hệ sinh thái 1",
   "description": "TeachLearn Board Tương Tác nâng cấp offline, Bỏ đăng nhập",
-  "requestFramePermissions": [
-    "microphone"
-  ],
+  "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

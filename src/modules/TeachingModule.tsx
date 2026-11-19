@@ -36,6 +36,7 @@ import { MathText } from '../components/MathText';
 import { SmartboardCanvasStudio } from '../components/SmartboardCanvasStudio';
 import { SmartboardViewport } from '../components/SmartboardViewport';
 import { ThreeSpatialAndGameLab } from '../components/ThreeSpatialAndGameLab';
+import { ToolErrorBoundary } from '../components/ToolErrorBoundary';
 import { KNTT_MATH_CURRICULUM } from '../data/curriculumKNTT';
 import { MOCK_EXAM_0107 } from '../data/mockExam0107';
 import { BankQuestion, ModuleId } from '../types/eduplan';
@@ -1614,19 +1615,25 @@ export const TeachingModule: React.FC<TeachingModuleProps> = ({
       )}
 
       {/* 2. Khảo sát & Vẽ đồ thị hàm số */}
-      {activeTab === 'function_plot' && <FunctionInvestigationPanel />}
+      {activeTab === 'function_plot' && (
+        <ToolErrorBoundary toolName="Công cụ Khảo sát & Vẽ đồ thị Hàm số">
+          <FunctionInvestigationPanel />
+        </ToolErrorBoundary>
+      )}
 
       {/* 3. Không gian Hình học 3D động (Đã xóa bỏ khung vẽ 2D/3D Xuất Word & PNG trùng lặp) */}
       {activeTab === 'geometry_3d' && (
-        <ThreeSpatialAndGameLab
-          onSendToSmartboard={(payload) => {
-            setPendingIncomingWidget({
-              id: `${Date.now()}`,
-              ...payload,
-            });
-            onSelectModule?.('teaching_smartboard');
-          }}
-        />
+        <ToolErrorBoundary toolName="Phòng thí nghiệm Hình học Không gian 3D">
+          <ThreeSpatialAndGameLab
+            onSendToSmartboard={(payload) => {
+              setPendingIncomingWidget({
+                id: `${Date.now()}`,
+                ...payload,
+              });
+              onSelectModule?.('teaching_smartboard');
+            }}
+          />
+        </ToolErrorBoundary>
       )}
 
       {/* 5. Bài giảng (Liên thông trực tiếp với App Chính · Tải file Máy tính · Google Drive) */}

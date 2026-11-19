@@ -45,6 +45,7 @@ import {
 } from './lib/firebase';
 import { Sidebar, TEACHLEARN_BOARD_TOOLS } from './components/Sidebar';
 import { FloatingTools } from './components/FloatingTools';
+import { ToolErrorBoundary } from './components/ToolErrorBoundary';
 import { HelpModal, SystemConfigModal } from './components/Modals';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import {
@@ -1667,7 +1668,9 @@ export default function App() {
         </main>
       </div>
 
-      <FloatingTools />
+      <ToolErrorBoundary toolName="Bộ công cụ nổi (Máy tính & GeoGebra)" compact>
+        <FloatingTools />
+      </ToolErrorBoundary>
 
       <OralMatrixConfigModal
         open={Boolean(matrixModalState?.open)}

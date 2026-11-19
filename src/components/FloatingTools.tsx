@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calculator, Compass, X, RotateCcw } from 'lucide-react';
 import { ScientificCalculatorModal } from './ScientificCalculatorModal';
+import { ToolErrorBoundary } from './ToolErrorBoundary';
 
 export const FloatingTools: React.FC = () => {
   const [openTool, setOpenTool] = useState<'none' | 'casio' | 'geogebra'>('none');
@@ -47,13 +48,24 @@ export const FloatingTools: React.FC = () => {
         </button>
       </div>
 
-      {/* Scientific Calculator Floating Draggable Window */}
+      {/* Scientific Calculator Floating Draggable Window (Isolated Error Boundary) */}
       {openTool === 'casio' && (
-        <ScientificCalculatorModal onClose={() => setOpenTool('none')} />
+        <ToolErrorBoundary
+          toolName="Máy tính Khoa học VINACAL 680EX PLUS III"
+          compact
+          onClose={() => setOpenTool('none')}
+        >
+          <ScientificCalculatorModal onClose={() => setOpenTool('none')} />
+        </ToolErrorBoundary>
       )}
 
-      {/* GeoGebra Quick Plotter & Ruler */}
+      {/* GeoGebra Quick Plotter & Ruler (Isolated Error Boundary) */}
       {openTool === 'geogebra' && (
+        <ToolErrorBoundary
+          toolName="Bảng vẽ GeoGebra & Thước đo nhanh"
+          compact
+          onClose={() => setOpenTool('none')}
+        >
         <div className="no-print fixed right-3 bottom-20 left-3 z-50 overflow-hidden rounded-[8px] border border-[#E2E8F0] bg-white text-[#334155] shadow-xl sm:right-20 sm:bottom-5 sm:left-auto sm:w-84">
           <div className="flex items-center justify-between bg-[#136F63] px-4 py-2 text-white">
             <div className="text-[13.5px] font-semibold">Bảng vẽ GeoGebra &amp; Thước đo nhanh</div>
@@ -116,6 +128,7 @@ export const FloatingTools: React.FC = () => {
             </div>
           </div>
         </div>
+        </ToolErrorBoundary>
       )}
     </>
   );

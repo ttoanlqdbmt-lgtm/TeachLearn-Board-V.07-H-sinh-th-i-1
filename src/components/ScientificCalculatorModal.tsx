@@ -78,6 +78,57 @@ type GeomToolId = 1 | 2 | 3 | 4;
 
 const MEM_KEYS: MemoryVarName[] = ['A', 'B', 'C', 'D', 'E', 'F', 'X', 'Y', 'M'];
 
+// Authentic Vinacal 680EX PLUS III Sculpted Keycap Component (hoisted outside modal to prevent remounts)
+const VinacalKey: React.FC<{
+  label: React.ReactNode;
+  shiftLabel?: string;
+  alphaLabel?: string;
+  onClick: () => void;
+  variant?: 'sci' | 'num' | 'blue' | 'pill' | 'pillBlue';
+  active?: boolean;
+  title?: string;
+  compactLegend?: boolean;
+}> = ({
+  label,
+  shiftLabel,
+  alphaLabel,
+  onClick,
+  variant = 'sci',
+  active = false,
+  title,
+  compactLegend = false,
+}) => {
+  const keyStyles: Record<string, string> = {
+    sci: 'h-[28px] rounded-[5px] border border-[#2C4766] bg-gradient-to-b from-[#F4F7FB] to-[#DAE3EE] text-[#172B4D] text-[11.5px] font-bold shadow-[0_2px_0_#466482] hover:from-white hover:to-[#E4ECF5] active:translate-y-[1px] active:shadow-[0_1px_0_#466482]',
+    num: 'h-[33px] rounded-[6px] border border-[#2C4766] bg-gradient-to-b from-[#F7FAFD] to-[#DDE6F0] text-[#10243E] text-[15px] font-bold shadow-[0_2.5px_0_#466482] hover:from-white hover:to-[#E7EFF8] active:translate-y-[1px] active:shadow-[0_1px_0_#466482]',
+    blue: 'h-[33px] rounded-[6px] border border-[#1E3A8A] bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] text-white text-[13px] font-extrabold tracking-wide shadow-[0_2.5px_0_#172554] hover:from-[#3B82F6] hover:to-[#2563EB] active:translate-y-[1px] active:shadow-[0_1px_0_#172554]',
+    pill: active
+      ? 'h-[24px] rounded-full border border-[#1E3A8A] bg-[#1D4ED8] text-white text-[10px] font-extrabold tracking-wide shadow-[0_2px_0_#172554]'
+      : 'h-[24px] rounded-full border border-[#2C4766] bg-gradient-to-b from-[#F7FAFD] to-[#D8E2EE] text-[#172B4D] text-[10px] font-extrabold tracking-wide shadow-[0_2px_0_#466482] hover:from-white hover:to-[#E4ECF5] active:translate-y-[1px]',
+    pillBlue:
+      'h-[24px] rounded-full border border-[#1E3A8A] bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] text-white text-[10px] font-extrabold tracking-wide shadow-[0_2px_0_#172554] hover:from-[#3B82F6] hover:to-[#2563EB] active:translate-y-[1px]',
+  };
+
+  return (
+    <div className="flex flex-col items-stretch">
+      {!compactLegend && (
+        <div className="mb-[2px] flex h-[12px] items-end justify-between px-[2px] text-[8.5px] leading-none font-bold tracking-tight select-none">
+          <span className="truncate text-[#1E3A8A]">{shiftLabel ?? ''}</span>
+          <span className="truncate text-[#BE123C]">{alphaLabel ?? ''}</span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        className={`flex w-full items-center justify-center transition-all select-none ${keyStyles[variant]}`}
+      >
+        {label}
+      </button>
+    </div>
+  );
+};
+
 export const ScientificCalculatorModal: React.FC<ScientificCalculatorModalProps> = ({ onClose }) => {
   // Draggable window position
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
@@ -922,7 +973,12 @@ export const ScientificCalculatorModal: React.FC<ScientificCalculatorModalProps>
     }
   };
 
-  const exprLatexWithCursor = nodesToLatex(editor.nodes, editor.cursor, overlay === 'none');
+  let exprLatexWithCursor = '';
+  try {
+    exprLatexWithCursor = nodesToLatex(editor.nodes, editor.cursor, overlay === 'none');
+  } catch {
+    exprLatexWithCursor = '';
+  }
   const displayedResultLatex = showPolar
     ? resultPolarLatex
     : showDecimal
@@ -930,58 +986,6 @@ export const ScientificCalculatorModal: React.FC<ScientificCalculatorModalProps>
     : resultExactLatex;
 
   const isFormulaMode = mode === 'COMP' || mode === 'CMPLX';
-
-  // Authentic Vinacal 680EX PLUS III Sculpted Keycap Component
-  // Always renders a fixed-height 13px legend bar above EVERY key so rows align to the millimeter!
-  const VinacalKey: React.FC<{
-    label: React.ReactNode;
-    shiftLabel?: string;
-    alphaLabel?: string;
-    onClick: () => void;
-    variant?: 'sci' | 'num' | 'blue' | 'pill' | 'pillBlue';
-    active?: boolean;
-    title?: string;
-    compactLegend?: boolean;
-  }> = ({
-    label,
-    shiftLabel,
-    alphaLabel,
-    onClick,
-    variant = 'sci',
-    active = false,
-    title,
-    compactLegend = false,
-  }) => {
-    const keyStyles: Record<string, string> = {
-      sci: 'h-[28px] rounded-[5px] border border-[#2C4766] bg-gradient-to-b from-[#F4F7FB] to-[#DAE3EE] text-[#172B4D] text-[11.5px] font-bold shadow-[0_2px_0_#466482] hover:from-white hover:to-[#E4ECF5] active:translate-y-[1px] active:shadow-[0_1px_0_#466482]',
-      num: 'h-[33px] rounded-[6px] border border-[#2C4766] bg-gradient-to-b from-[#F7FAFD] to-[#DDE6F0] text-[#10243E] text-[15px] font-bold shadow-[0_2.5px_0_#466482] hover:from-white hover:to-[#E7EFF8] active:translate-y-[1px] active:shadow-[0_1px_0_#466482]',
-      blue: 'h-[33px] rounded-[6px] border border-[#1E3A8A] bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] text-white text-[13px] font-extrabold tracking-wide shadow-[0_2.5px_0_#172554] hover:from-[#3B82F6] hover:to-[#2563EB] active:translate-y-[1px] active:shadow-[0_1px_0_#172554]',
-      pill: active
-        ? 'h-[24px] rounded-full border border-[#1E3A8A] bg-[#1D4ED8] text-white text-[10px] font-extrabold tracking-wide shadow-[0_2px_0_#172554]'
-        : 'h-[24px] rounded-full border border-[#2C4766] bg-gradient-to-b from-[#F7FAFD] to-[#D8E2EE] text-[#172B4D] text-[10px] font-extrabold tracking-wide shadow-[0_2px_0_#466482] hover:from-white hover:to-[#E4ECF5] active:translate-y-[1px]',
-      pillBlue:
-        'h-[24px] rounded-full border border-[#1E3A8A] bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] text-white text-[10px] font-extrabold tracking-wide shadow-[0_2px_0_#172554] hover:from-[#3B82F6] hover:to-[#2563EB] active:translate-y-[1px]',
-    };
-
-    return (
-      <div className="flex flex-col items-stretch">
-        {!compactLegend && (
-          <div className="mb-[2px] flex h-[12px] items-end justify-between px-[2px] text-[8.5px] leading-none font-bold tracking-tight select-none">
-            <span className="truncate text-[#1E3A8A]">{shiftLabel ?? ''}</span>
-            <span className="truncate text-[#BE123C]">{alphaLabel ?? ''}</span>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={onClick}
-          title={title}
-          className={`flex w-full items-center justify-center transition-all select-none ${keyStyles[variant]}`}
-        >
-          {label}
-        </button>
-      </div>
-    );
-  };
 
   return (
     <div

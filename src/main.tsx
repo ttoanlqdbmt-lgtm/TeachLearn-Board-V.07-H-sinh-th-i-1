@@ -73,19 +73,31 @@ class RootErrorBoundary extends React.Component<
 }
 
 try {
-  registerSW({
-    immediate: true,
-    onOfflineReady() {
-      try {
-        localStorage.setItem('tl_board_pwa_offline_ready', '1');
-      } catch {
-        // Ignore storage restrictions
-      }
-    },
-    onRegisterError(err) {
-      console.warn('PWA Service Worker registration warning:', err);
-    },
-  });
+  if (import.meta.env.PROD) {
+    registerSW({
+      immediate: true,
+      onOfflineReady() {
+        try {
+          localStorage.setItem('tl_board_pwa_offline_ready', '1');
+        } catch {
+          // Ignore storage restrictions
+        }
+      },
+      onRegisterError(err) {
+        console.warn('PWA Service Worker registration warning:', err);
+      },
+    });
+  } else if ('serviceWorker' in navigator) {
+    // Clean up any stale dev SW that could serve mismatched cached ES modules
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => {
+        regs.forEach((r) => {
+          r.unregister().catch(() => {});
+        });
+      })
+      .catch(() => {});
+  }
 } catch {
   // Fallback safely if SW registration is restricted in iframe
 }
