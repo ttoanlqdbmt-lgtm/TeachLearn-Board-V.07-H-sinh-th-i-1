@@ -19,6 +19,7 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  Feather,
   FileDown,
   FileQuestion,
   Grid,
@@ -37,6 +38,7 @@ import {
   PanelLeft,
   PanelRight,
   Pause,
+  Pencil,
   PenTool,
   Play,
   Plus,
@@ -60,6 +62,7 @@ import {
   Wand2,
   X,
   Youtube,
+  Zap,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -99,6 +102,20 @@ import {
   SplitRightBoardController,
   SplitRightBoardPane,
 } from './SplitRightBoardPane';
+import {
+  createInkFilterSession,
+  DEFAULT_PEN_NIB_TYPE,
+  DEFAULT_PEN_PREDICTION,
+  DEFAULT_PEN_SMOOTHING,
+  filterInkSample,
+  finalizeSmoothedStrokePoints,
+  getSmoothingLabel,
+  InkFilterSession,
+  PenNibType,
+  predictStrokeTail,
+  renderPencilStrokeOnContext,
+  SMOOTHING_PRESETS,
+} from '../utils/inkSmoothingEngine';
 import {
   formatMcqOptionDisplay,
   normalizeSolutionSteps,
@@ -357,6 +374,7 @@ export function drawSnapIndicatorOnContext(
 export interface SmartboardStroke {
   id: string;
   tool: 'pen' | 'highlighter' | 'shape';
+  nibType?: PenNibType;
   shapeKind?: 'line' | 'arrow' | 'circle' | 'triangle' | 'rectangle' | 'template_figure';
   lineStyle?: StrokeLineStyle;
   rotationDeg?: number;
@@ -879,7 +897,8 @@ export function drawStrokeOnContext(
   stroke: SmartboardStroke,
   panX: number,
   panY: number,
-  zoom: number
+  zoom: number,
+  predictedTail?: StrokePoint[]
 ) {
   if (stroke.points.length === 0 && !stroke.templateBox) return;
 
@@ -1014,11 +1033,34 @@ export function drawStrokeOnContext(
   }
 
   // Apply chosen line dash style for regular strokes & 2D shapes
-  ctx.setLineDash(getCanvasLineDash(stroke.lineStyle, zoom));
+  const lineDash = getCanvasLineDash(stroke.lineStyle, zoom);
+  ctx.setLineDash(lineDash);
 
-  if (stroke.points.length === 1) {
+  // Merge ephemeral velocity-predicted tail ONLY during live drawing of freehand pen strokes
+  const renderPoints: StrokePoint[] =
+    predictedTail && predictedTail.length > 0 && stroke.tool === 'pen'
+      ? [...stroke.points, ...predictedTail]
+      : stroke.points;
+
+  // Graphite Pencil (Bút chì) renderer with deterministic flicker-free micro-grain
+  if (stroke.tool === 'pen' && stroke.nibType === 'pencil') {
+    renderPencilStrokeOnContext(
+      ctx,
+      renderPoints,
+      stroke.width,
+      stroke.color,
+      stroke.opacity,
+      toScreen,
+      zoom,
+      lineDash
+    );
+    ctx.restore();
+    return;
+  }
+
+  if (renderPoints.length === 1) {
     ctx.setLineDash([]);
-    const p = toScreen(stroke.points[0]);
+    const p = toScreen(renderPoints[0]);
     ctx.beginPath();
     ctx.arc(p.x, p.y, (stroke.width * zoom) / 2, 0, Math.PI * 2);
     ctx.fill();
@@ -1060,22 +1102,26 @@ export function drawStrokeOnContext(
     return;
   }
 
-  // Smooth quadratic Bezier curve for freehand Pen & Highlighter
+  // Smooth quadratic Bezier curve for freehand Pen (Fountain / Standard) & Highlighter
   const isSolidPen =
     stroke.tool === 'pen' && (!stroke.lineStyle || stroke.lineStyle === 'solid');
+  const isStandardNib = stroke.nibType === 'standard';
   const hasVariableWidth =
-    isSolidPen && stroke.points.length >= 3 && stroke.points.some((p) => p.wFactor !== undefined);
+    isSolidPen &&
+    !isStandardNib &&
+    renderPoints.length >= 3 &&
+    renderPoints.some((p) => p.wFactor !== undefined);
 
   if (hasVariableWidth) {
     ctx.setLineDash([]);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     const baseW = stroke.width * zoom;
-    let prevMid = toScreen(stroke.points[0]);
+    let prevMid = toScreen(renderPoints[0]);
 
-    for (let i = 1; i < stroke.points.length - 1; i++) {
-      const currPt = stroke.points[i];
-      const nextPt = stroke.points[i + 1];
+    for (let i = 1; i < renderPoints.length - 1; i++) {
+      const currPt = renderPoints[i];
+      const nextPt = renderPoints[i + 1];
       const curr = toScreen(currPt);
       const next = toScreen(nextPt);
       const midX = (curr.x + next.x) / 2;
@@ -1091,7 +1137,7 @@ export function drawStrokeOnContext(
       prevMid = { x: midX, y: midY };
     }
 
-    const lastPt = stroke.points[stroke.points.length - 1];
+    const lastPt = renderPoints[renderPoints.length - 1];
     const last = toScreen(lastPt);
     ctx.beginPath();
     ctx.lineWidth = Math.max(1.2, baseW * (lastPt.wFactor ?? 0.9));
@@ -1103,18 +1149,18 @@ export function drawStrokeOnContext(
   }
 
   ctx.beginPath();
-  const p0 = toScreen(stroke.points[0]);
+  const p0 = toScreen(renderPoints[0]);
   ctx.moveTo(p0.x, p0.y);
 
-  for (let i = 1; i < stroke.points.length - 1; i++) {
-    const curr = toScreen(stroke.points[i]);
-    const next = toScreen(stroke.points[i + 1]);
+  for (let i = 1; i < renderPoints.length - 1; i++) {
+    const curr = toScreen(renderPoints[i]);
+    const next = toScreen(renderPoints[i + 1]);
     const midX = (curr.x + next.x) / 2;
     const midY = (curr.y + next.y) / 2;
     ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
   }
 
-  const last = toScreen(stroke.points[stroke.points.length - 1]);
+  const last = toScreen(renderPoints[renderPoints.length - 1]);
   ctx.lineTo(last.x, last.y);
   ctx.stroke();
   ctx.restore();
@@ -1673,6 +1719,9 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
   const [penColor, setPenColor] = useState('#0F172A');
   const [penWidth, setPenWidth] = useState(4);
   const [penLineStyle, setPenLineStyle] = useState<StrokeLineStyle>('solid');
+  const [penNibType, setPenNibType] = useState<PenNibType>(DEFAULT_PEN_NIB_TYPE);
+  const [penSmoothing, setPenSmoothing] = useState<number>(DEFAULT_PEN_SMOOTHING);
+  const [penPredictionEnabled, setPenPredictionEnabled] = useState<boolean>(DEFAULT_PEN_PREDICTION);
   const [highlighterColor, setHighlighterColor] = useState('#FACC15');
   const [eraserMode, setEraserMode] = useState<EraserSubMode>('stroke');
   const [smartShapeMode, setSmartShapeMode] = useState<SmartShapeSubMode>('auto');
@@ -1855,6 +1904,8 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
   const gestureRef = useRef<{
     mode: 'none' | 'draw' | 'pan' | 'pinch' | 'lasso' | 'select_lasso';
     currentStroke: SmartboardStroke | null;
+    inkSession: InkFilterSession | null;
+    predictedTail: StrokePoint[];
     startPanX: number;
     startPanY: number;
     startClientX: number;
@@ -1869,6 +1920,8 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
   }>({
     mode: 'none',
     currentStroke: null,
+    inkSession: null,
+    predictedTail: [],
     startPanX: 0,
     startPanY: 0,
     startClientX: 0,
@@ -2365,9 +2418,16 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
     ctx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // 1. Draw ONLY the active in-progress stroke (freehand Bezier, rubber-band line, or 3D preview)
+    // 1. Draw ONLY the active in-progress stroke (with ephemeral velocity-predicted tail for zero perceived lag)
     if (gestureRef.current.currentStroke) {
-      drawStrokeOnContext(ctx, gestureRef.current.currentStroke, panX, panY, zoom);
+      drawStrokeOnContext(
+        ctx,
+        gestureRef.current.currentStroke,
+        panX,
+        panY,
+        zoom,
+        gestureRef.current.predictedTail
+      );
     }
 
     // 2. Draw magnetic green snap indicators (start / end / hover)
@@ -3633,20 +3693,43 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
       return;
     }
 
-    // Pen, Highlighter, or 2D Smart Shape (Zero-Latency Smooth Ink on Active Layer ONLY)
+    // Pen, Highlighter, or 2D Smart Shape (Zero-Latency Smooth Ink + Velocity Prediction on Active Layer ONLY)
     const worldPtBase = maybeSnapToVirtualRuler(rawWorldPt);
     const nowT = e.timeStamp || performance.now();
-    const startInkPt: StrokePoint = {
-      x: worldPtBase.x,
-      y: worldPtBase.y,
-      pressure: e.pressure,
-      t: nowT,
-      wFactor: computeInkWidthFactor(undefined, worldPtBase, e.pointerType, e.pressure),
-    };
     const isHighlighter = activeTool === 'highlighter';
+    const isFreehandPen = activeTool === 'pen';
+
+    let startInkPt: StrokePoint;
+    gestureRef.current.inkSession = null;
+    gestureRef.current.predictedTail = [];
+
+    if (isFreehandPen) {
+      const { session, initialPoint } = createInkFilterSession(
+        { x: worldPtBase.x, y: worldPtBase.y, pressure: e.pressure, t: nowT },
+        e.pointerType,
+        {
+          nibType: penNibType,
+          smoothingLevel: penSmoothing,
+          predictionEnabled: penPredictionEnabled,
+          zoom,
+        }
+      );
+      gestureRef.current.inkSession = session;
+      startInkPt = initialPoint;
+    } else {
+      startInkPt = {
+        x: worldPtBase.x,
+        y: worldPtBase.y,
+        pressure: e.pressure,
+        t: nowT,
+        wFactor: computeInkWidthFactor(undefined, worldPtBase, e.pointerType, e.pressure),
+      };
+    }
+
     const newStroke: SmartboardStroke = {
       id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       tool: isHighlighter ? 'highlighter' : activeTool === 'smart_shape' ? 'shape' : 'pen',
+      nibType: isFreehandPen ? penNibType : undefined,
       lineStyle: isHighlighter ? 'solid' : penLineStyle,
       color: isHighlighter ? highlighterColor : penColor,
       width: isHighlighter ? 22 : penWidth,
@@ -3811,7 +3894,7 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
         return;
       }
 
-      // 3. Low-Latency Smooth Ink: collect ALL micro-points via getCoalescedEvents() onto Active Layer ONLY
+      // 3. Low-Latency Smooth Ink: collect ALL micro-points via getCoalescedEvents() + Adaptive One-Euro Filter + Velocity Prediction
       const nativeEvt = e.nativeEvent as PointerEvent;
       const coalescedEvents: PointerEvent[] =
         typeof nativeEvt.getCoalescedEvents === 'function'
@@ -3819,30 +3902,64 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
           : [nativeEvt];
       const samples = coalescedEvents.length > 0 ? coalescedEvents : [nativeEvt];
 
-      const minWorldStep = 1.4 / Math.max(zoom, 0.5);
+      const inkSession = activeStroke.tool === 'pen' ? gestureRef.current.inkSession : null;
+      const minWorldStep = (inkSession ? 1.15 : 1.4) / Math.max(zoom, 0.5);
+
       for (const sample of samples) {
         const sampleWorld = maybeSnapToVirtualRuler(
           screenToWorld(sample.clientX, sample.clientY)
         );
-        const lastPt = activeStroke.points[activeStroke.points.length - 1];
-        if (lastPt && distance(lastPt, sampleWorld) < minWorldStep) {
-          continue;
-        }
         const sampleT = sample.timeStamp || performance.now();
-        const wFactor = computeInkWidthFactor(
-          lastPt,
-          { ...sampleWorld, t: sampleT },
-          sample.pointerType || e.pointerType,
-          sample.pressure ?? e.pressure
-        );
-        activeStroke.points.push({
-          x: sampleWorld.x,
-          y: sampleWorld.y,
-          pressure: sample.pressure ?? e.pressure,
-          t: sampleT,
-          wFactor,
-        });
+        const ptrType = sample.pointerType || e.pointerType;
+        const ptrPressure = sample.pressure ?? e.pressure;
+
+        if (inkSession) {
+          const filteredPt = filterInkSample(
+            inkSession,
+            { x: sampleWorld.x, y: sampleWorld.y, pressure: ptrPressure, t: sampleT },
+            ptrType
+          );
+          const lastPt = activeStroke.points[activeStroke.points.length - 1];
+          if (!lastPt || distance(lastPt, filteredPt) >= minWorldStep) {
+            activeStroke.points.push(filteredPt);
+          }
+        } else {
+          const lastPt = activeStroke.points[activeStroke.points.length - 1];
+          if (lastPt && distance(lastPt, sampleWorld) < minWorldStep) {
+            continue;
+          }
+          const wFactor = computeInkWidthFactor(
+            lastPt,
+            { ...sampleWorld, t: sampleT },
+            ptrType,
+            ptrPressure
+          );
+          activeStroke.points.push({
+            x: sampleWorld.x,
+            y: sampleWorld.y,
+            pressure: ptrPressure,
+            t: sampleT,
+            wFactor,
+          });
+        }
       }
+
+      // Compute ephemeral velocity-based predicted tail (NEVER persisted into activeStroke.points)
+      if (inkSession && inkSession.predictionEnabled) {
+        let nativePredPts: Array<{ x: number; y: number }> | undefined;
+        if (typeof nativeEvt.getPredictedEvents === 'function') {
+          const predEvts = nativeEvt.getPredictedEvents();
+          if (predEvts && predEvts.length > 0) {
+            nativePredPts = predEvts
+              .slice(0, 2)
+              .map((pe) => maybeSnapToVirtualRuler(screenToWorld(pe.clientX, pe.clientY)));
+          }
+        }
+        gestureRef.current.predictedTail = predictStrokeTail(inkSession, zoom, nativePredPts);
+      } else {
+        gestureRef.current.predictedTail = [];
+      }
+
       scheduleActiveCanvasRender();
     }
   };
@@ -4033,7 +4150,24 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
           points: recognized.points,
         };
         selectAfterCommit = true;
+      } else if (
+        finishedStroke.tool === 'pen' &&
+        !finishedStroke.templateId &&
+        finishedStroke.points.length >= 3
+      ) {
+        // 4. Corner-preserving post-stroke smoothing & fountain pen entry/exit tapering
+        const resolvedNib: PenNibType = finishedStroke.nibType || 'fountain';
+        if (resolvedNib === 'fountain' || resolvedNib === 'pencil' || penSmoothing > 0) {
+          finishedStroke = {
+            ...finishedStroke,
+            points: finalizeSmoothedStrokePoints(finishedStroke.points, resolvedNib, penSmoothing),
+          };
+        }
       }
+
+      // Discard ephemeral prediction tail & ink filter session before committing
+      gestureRef.current.inkSession = null;
+      gestureRef.current.predictedTail = [];
 
       if (finishedStroke) {
         // Step 1 (CRITICAL): Render finalized Bezier stroke directly onto Bottom (Main) Canvas FIRST
@@ -5138,7 +5272,7 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
           <MousePointer className="h-5 w-5" />
         </button>
 
-        {/* 2. Smooth Pen (Bút viết nét mượt + 4 kiểu nét vẽ kỹ thuật) */}
+        {/* 2. Smooth Pen (Bút máy / Bút chì / Nét đều + Làm mượt Smoothing + Dự đoán nét) */}
         <div className="relative">
           <button
             type="button"
@@ -5146,10 +5280,16 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
               setActiveTool('pen');
               setOpenPopover((p) => (p === 'pen' ? 'none' : 'pen'));
             }}
-            title="Bút viết nét mượt (Chọn màu mực, Cỡ nét & 4 Kiểu nét vẽ: Liền, Đứt chuẩn, Đứt mảnh, Chấm gạch)"
+            title={`Bút viết (${penNibType === 'fountain' ? 'Bút máy' : penNibType === 'pencil' ? 'Bút chì' : 'Nét đều'} · Làm mượt ${penSmoothing}%${penPredictionEnabled ? ' · Dự đoán nét Bật' : ''})`}
             className={`${btnBase} ${activeTool === 'pen' ? btnActive : btnInactive}`}
           >
-            <PenTool className="h-5 w-5" />
+            {penNibType === 'fountain' ? (
+              <Feather className="h-5 w-5" />
+            ) : penNibType === 'pencil' ? (
+              <Pencil className="h-5 w-5" />
+            ) : (
+              <PenTool className="h-5 w-5" />
+            )}
             <span
               className="absolute right-1.5 bottom-1.5 h-3 w-3 rounded-full border border-white shadow-xs"
               style={{ backgroundColor: penColor }}
@@ -5163,7 +5303,7 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
 
           {openPopover === 'pen' && (
             <div
-              className={`absolute z-50 w-72 rounded-[8px] border border-[#CBD5E1] bg-white p-3 shadow-xl ${
+              className={`absolute z-50 max-h-[78vh] w-80 overflow-y-auto rounded-[8px] border border-[#CBD5E1] bg-white p-3 shadow-xl ${
                 dockPos === 'bottom'
                   ? 'bottom-14 left-0'
                   : dockPos === 'left'
@@ -5171,7 +5311,134 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
                     : 'top-0 right-14'
               }`}
             >
-              <div className="mb-2 text-[12px] font-bold text-slate-700">
+              {/* 1. Kiểu đầu bút: Bút máy / Bút chì / Nét đều */}
+              <div className="mb-1.5 flex items-center justify-between text-[12px] font-bold text-[#136F63]">
+                <span>Kiểu đầu bút</span>
+                <span className="text-[10.5px] font-semibold text-slate-500">
+                  {penNibType === 'fountain'
+                    ? 'Thanh đậm theo tốc độ'
+                    : penNibType === 'pencil'
+                      ? 'Vân chì tự nhiên'
+                      : 'Độ dày đều kỹ thuật'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  {
+                    id: 'fountain' as PenNibType,
+                    label: 'Bút máy',
+                    hint: 'Thanh đậm',
+                    Icon: Feather,
+                  },
+                  {
+                    id: 'pencil' as PenNibType,
+                    label: 'Bút chì',
+                    hint: 'Vân chì nhẹ',
+                    Icon: Pencil,
+                  },
+                  {
+                    id: 'standard' as PenNibType,
+                    label: 'Nét đều',
+                    hint: 'Kỹ thuật',
+                    Icon: PenTool,
+                  },
+                ].map(({ id, label, hint, Icon }) => {
+                  const isSel = penNibType === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setPenNibType(id);
+                        setActiveTool('pen');
+                      }}
+                      className={`flex flex-col items-center justify-center rounded-[7px] border px-1.5 py-2 text-center transition-colors ${
+                        isSel
+                          ? 'border-[#136F63] bg-[#136F63] text-white shadow-xs'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-[#136F63]/50 hover:bg-emerald-50/50'
+                      }`}
+                    >
+                      <Icon className="mb-0.5 h-4 w-4" />
+                      <span className="text-[11.5px] leading-tight font-bold">{label}</span>
+                      <span
+                        className={`text-[9.5px] leading-tight ${
+                          isSel ? 'text-emerald-100' : 'text-slate-500'
+                        }`}
+                      >
+                        {hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 2. Làm mượt nét (Smoothing) & Dự đoán nét vẽ */}
+              <div className="mt-3 rounded-[7px] border border-slate-200 bg-slate-50/90 p-2.5">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[11.5px] font-bold text-slate-800">
+                    Làm mượt nét (Smoothing)
+                  </span>
+                  <span className="tabular-nums text-[11px] font-bold text-[#136F63]">
+                    {penSmoothing}% · {getSmoothingLabel(penSmoothing)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={penSmoothing}
+                  onChange={(e) => setPenSmoothing(Number(e.target.value))}
+                  aria-label="Mức làm mượt nét bút"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-[#136F63]"
+                />
+                <div className="mt-2 grid grid-cols-3 gap-1">
+                  {SMOOTHING_PRESETS.map((preset) => {
+                    const activePreset = penSmoothing === preset.value;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setPenSmoothing(preset.value)}
+                        className={`rounded-[5px] border py-1 text-[10.5px] font-semibold transition-colors ${
+                          activePreset
+                            ? 'border-[#136F63] bg-emerald-50 text-[#136F63]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {preset.label} ({preset.value}%)
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Toggle: Dự đoán vị trí nét vẽ theo tốc độ con trỏ */}
+                <div className="mt-2.5 flex items-center justify-between border-t border-slate-200/80 pt-2">
+                  <div className="pr-2">
+                    <div className="flex items-center gap-1 text-[11.5px] font-bold text-slate-800">
+                      <Zap className="h-3.5 w-3.5 text-[#136F63]" />
+                      <span>Dự đoán nét vẽ</span>
+                    </div>
+                    <div className="text-[10px] leading-snug text-slate-500">
+                      Bù độ trễ theo tốc độ bút khi viết nhanh
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-pressed={penPredictionEnabled}
+                    onClick={() => setPenPredictionEnabled((prev) => !prev)}
+                    className={`inline-flex h-7 min-w-[54px] shrink-0 items-center justify-center rounded-[6px] border px-2 text-[11px] font-bold transition-colors ${
+                      penPredictionEnabled
+                        ? 'border-[#136F63] bg-[#136F63] text-white'
+                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {penPredictionEnabled ? 'Bật' : 'Tắt'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 mb-2 text-[12px] font-bold text-slate-700">
                 Màu mực Bút viết (Chuẩn 65–86&quot;)
               </div>
               <div className="flex items-center gap-2">
@@ -8914,6 +9181,9 @@ export const SmartboardCanvasStudio: React.FC<SmartboardCanvasStudioProps> = ({
               penColor={penColor}
               penWidth={penWidth}
               penLineStyle={penLineStyle}
+              penNibType={penNibType}
+              penSmoothing={penSmoothing}
+              penPredictionEnabled={penPredictionEnabled}
               highlighterColor={highlighterColor}
               eraserMode={eraserMode}
               smartShapeMode={smartShapeMode}

@@ -66,6 +66,17 @@ import {
   SnapTarget,
   StrokePoint,
 } from './SmartboardCanvasStudio';
+import {
+  createInkFilterSession,
+  DEFAULT_PEN_NIB_TYPE,
+  DEFAULT_PEN_PREDICTION,
+  DEFAULT_PEN_SMOOTHING,
+  filterInkSample,
+  finalizeSmoothedStrokePoints,
+  InkFilterSession,
+  PenNibType,
+  predictStrokeTail,
+} from '../utils/inkSmoothingEngine';
 
 export interface SplitBoardData {
   background: CanvasBackgroundType;
@@ -100,6 +111,9 @@ interface SplitRightBoardPaneProps {
   penColor: string;
   penWidth: number;
   penLineStyle: StrokeLineStyle;
+  penNibType?: PenNibType;
+  penSmoothing?: number;
+  penPredictionEnabled?: boolean;
   highlighterColor: string;
   eraserMode: EraserSubMode;
   smartShapeMode: SmartShapeSubMode;
@@ -135,6 +149,9 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
   penColor,
   penWidth,
   penLineStyle,
+  penNibType = DEFAULT_PEN_NIB_TYPE,
+  penSmoothing = DEFAULT_PEN_SMOOTHING,
+  penPredictionEnabled = DEFAULT_PEN_PREDICTION,
   highlighterColor,
   eraserMode,
   smartShapeMode,
@@ -188,6 +205,8 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
   const gestureRef = useRef<{
     mode: 'none' | 'draw' | 'pan' | 'pinch' | 'select_lasso';
     currentStroke: SmartboardStroke | null;
+    inkSession: InkFilterSession | null;
+    predictedTail: StrokePoint[];
     startPanX: number;
     startPanY: number;
     startClientX: number;
@@ -202,6 +221,8 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
   }>({
     mode: 'none',
     currentStroke: null,
+    inkSession: null,
+    predictedTail: [],
     startPanX: 0,
     startPanY: 0,
     startClientX: 0,
@@ -463,7 +484,14 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
     ctx.clearRect(0, 0, rect.width, rect.height);
 
     if (gestureRef.current.currentStroke) {
-      drawStrokeOnContext(ctx, gestureRef.current.currentStroke, panX, panY, zoom);
+      drawStrokeOnContext(
+        ctx,
+        gestureRef.current.currentStroke,
+        panX,
+        panY,
+        zoom,
+        gestureRef.current.predictedTail
+      );
     }
     const { hoverSnap, startSnap, endSnap } = snapIndicatorRef.current;
     if (hoverSnap) drawSnapIndicatorOnContext(ctx, hoverSnap, panX, panY, zoom, false);
@@ -1012,23 +1040,45 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
 
     const nowT = e.timeStamp || performance.now();
     const isHighlighter = activeTool === 'highlighter';
+    const isFreehandPen = activeTool === 'pen';
+
+    gestureRef.current.inkSession = null;
+    gestureRef.current.predictedTail = [];
+
+    let startInkPt: StrokePoint;
+    if (isFreehandPen) {
+      const { session, initialPoint } = createInkFilterSession(
+        { x: rawWorldPt.x, y: rawWorldPt.y, pressure: e.pressure, t: nowT },
+        e.pointerType,
+        {
+          nibType: penNibType,
+          smoothingLevel: penSmoothing,
+          predictionEnabled: penPredictionEnabled,
+          zoom,
+        }
+      );
+      gestureRef.current.inkSession = session;
+      startInkPt = initialPoint;
+    } else {
+      startInkPt = {
+        x: rawWorldPt.x,
+        y: rawWorldPt.y,
+        pressure: e.pressure,
+        t: nowT,
+        wFactor: computeInkWidthFactor(undefined, rawWorldPt, e.pointerType, e.pressure),
+      };
+    }
+
     gestureRef.current.mode = 'draw';
     gestureRef.current.currentStroke = {
       id: `rst-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       tool: isHighlighter ? 'highlighter' : activeTool === 'smart_shape' ? 'shape' : 'pen',
+      nibType: isFreehandPen ? penNibType : undefined,
       lineStyle: isHighlighter ? 'solid' : penLineStyle,
       color: isHighlighter ? highlighterColor : penColor,
       width: isHighlighter ? 22 : penWidth,
       opacity: isHighlighter ? 0.38 : 1,
-      points: [
-        {
-          x: rawWorldPt.x,
-          y: rawWorldPt.y,
-          pressure: e.pressure,
-          t: nowT,
-          wFactor: computeInkWidthFactor(undefined, rawWorldPt, e.pointerType, e.pressure),
-        },
-      ],
+      points: [startInkPt],
     };
     renderActiveCanvas();
   };
@@ -1158,18 +1208,67 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
         return;
       }
 
-      const lastPt = activeStroke.points[activeStroke.points.length - 1];
-      if (!lastPt || distance(lastPt, rawWorldPt) >= 1.5 / Math.max(zoom, 0.5)) {
-        const nowT = e.timeStamp || performance.now();
-        activeStroke.points.push({
-          x: rawWorldPt.x,
-          y: rawWorldPt.y,
-          pressure: e.pressure,
-          t: nowT,
-          wFactor: computeInkWidthFactor(lastPt, { ...rawWorldPt, t: nowT }, e.pointerType, e.pressure),
-        });
-        scheduleActiveCanvasRender();
+      const nativeEvt = e.nativeEvent as PointerEvent;
+      const coalescedEvents: PointerEvent[] =
+        typeof nativeEvt.getCoalescedEvents === 'function'
+          ? nativeEvt.getCoalescedEvents()
+          : [nativeEvt];
+      const samples = coalescedEvents.length > 0 ? coalescedEvents : [nativeEvt];
+
+      const inkSession = activeStroke.tool === 'pen' ? gestureRef.current.inkSession : null;
+      const minWorldStep = (inkSession ? 1.15 : 1.5) / Math.max(zoom, 0.5);
+
+      for (const sample of samples) {
+        const sampleWorld = screenToWorld(sample.clientX, sample.clientY);
+        const sampleT = sample.timeStamp || performance.now();
+        const ptrType = sample.pointerType || e.pointerType;
+        const ptrPressure = sample.pressure ?? e.pressure;
+
+        if (inkSession) {
+          const filteredPt = filterInkSample(
+            inkSession,
+            { x: sampleWorld.x, y: sampleWorld.y, pressure: ptrPressure, t: sampleT },
+            ptrType
+          );
+          const lastPt = activeStroke.points[activeStroke.points.length - 1];
+          if (!lastPt || distance(lastPt, filteredPt) >= minWorldStep) {
+            activeStroke.points.push(filteredPt);
+          }
+        } else {
+          const lastPt = activeStroke.points[activeStroke.points.length - 1];
+          if (!lastPt || distance(lastPt, sampleWorld) >= minWorldStep) {
+            activeStroke.points.push({
+              x: sampleWorld.x,
+              y: sampleWorld.y,
+              pressure: ptrPressure,
+              t: sampleT,
+              wFactor: computeInkWidthFactor(
+                lastPt,
+                { ...sampleWorld, t: sampleT },
+                ptrType,
+                ptrPressure
+              ),
+            });
+          }
+        }
       }
+
+      if (inkSession && inkSession.predictionEnabled) {
+        let nativePredPts: Array<{ x: number; y: number }> | undefined;
+        if (typeof nativeEvt.getPredictedEvents === 'function') {
+          const predEvts = nativeEvt.getPredictedEvents();
+          if (predEvts && predEvts.length > 0) {
+            nativePredPts = predEvts
+              .slice(0, 2)
+              .map((pe) => screenToWorld(pe.clientX, pe.clientY));
+          }
+        }
+        gestureRef.current.predictedTail = predictStrokeTail(inkSession, zoom, nativePredPts);
+      } else {
+        gestureRef.current.predictedTail = [];
+      }
+
+      scheduleActiveCanvasRender();
     }
   };
 
@@ -1318,8 +1417,22 @@ export const SplitRightBoardPane: React.FC<SplitRightBoardPaneProps> = ({
           points: recognized.points,
         };
         selectAfter = true;
+      } else if (
+        finishedStroke.tool === 'pen' &&
+        !finishedStroke.templateId &&
+        finishedStroke.points.length >= 3
+      ) {
+        const resolvedNib: PenNibType = finishedStroke.nibType || 'fountain';
+        if (resolvedNib === 'fountain' || resolvedNib === 'pencil' || penSmoothing > 0) {
+          finishedStroke = {
+            ...finishedStroke,
+            points: finalizeSmoothedStrokePoints(finishedStroke.points, resolvedNib, penSmoothing),
+          };
+        }
       }
 
+      gestureRef.current.inkSession = null;
+      gestureRef.current.predictedTail = [];
       gestureRef.current.currentStroke = null;
       snapIndicatorRef.current = { hoverSnap: null, startSnap: null, endSnap: null };
       clearActiveCanvas();
